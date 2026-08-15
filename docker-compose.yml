@@ -1,0 +1,16 @@
+services:
+  enterprise-rag:
+
+    image: enterprise-agentic-rag:latest
+    build: .
+
+    container_name: enterprise-agentic-rag
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./data:/app/data
+
+    command:
+      python -m app.evaluation.langsmith_eval

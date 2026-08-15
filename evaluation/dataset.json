@@ -1,0 +1,26 @@
+[
+    {
+        "question": "What is multi-head attention?",
+        "ground_truth": "Multi-head attention projects queries, keys and values using different learned linear projections and performs attention in parallel across multiple heads."
+    },
+    {
+        "question": "What positional encoding is used in the Transformer?",
+        "ground_truth": "The Transformer uses sinusoidal positional encoding."
+    },
+    {
+        "question": "What is the main contribution of the paper?",
+        "ground_truth": "The paper introduces the Transformer architecture, which relies entirely on attention mechanisms and removes recurrence and convolution."
+    },
+    {
+        "question": "What is scaled dot-product attention?",
+        "ground_truth": "Scaled dot-product attention computes attention using the dot products of queries and keys, scales them by the square root of the key dimension, applies softmax, and uses the result to weight the values."
+    },
+    {
+        "question": "What is the role of the encoder in the Transformer?",
+        "ground_truth": "The encoder transforms the input sequence into contextual representations using stacked self-attention and feed-forward layers."
+    },
+    {
+        "question": "What is the role of the decoder in the Transformer?",
+        "ground_truth": "The decoder generates the output sequence using masked self-attention, encoder-decoder attention, and feed-forward layers."
+    }
+]
