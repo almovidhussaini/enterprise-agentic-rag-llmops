@@ -1,26 +1,33 @@
-name: Enterprise Agentic RAG CI/CD
+name: Enterprise Agentic RAG CI
 
 on:
-
   push:
     branches:
       - main
+      - master
 
   pull_request:
     branches:
       - main
+      - master
+
+  workflow_dispatch:
 
 
-permissions:
-  contents: read
-  packages: write
+# ============================================================
+# GLOBAL ENVIRONMENT
+# ============================================================
 
+env:
+  PYTHON_VERSION: "3.11"
+  IMAGE_NAME: enterprise-agentic-rag
+
+
+# ============================================================
+# JOB 1 — PYTHON TESTS
+# ============================================================
 
 jobs:
-
-  # ==========================================================
-  # JOB 1 — PYTHON TESTS
-  # ==========================================================
 
   test:
 
@@ -31,7 +38,7 @@ jobs:
     steps:
 
       # --------------------------------------------------------
-      # Checkout
+      # Checkout repository
       # --------------------------------------------------------
 
       - name: Checkout repository
@@ -39,14 +46,14 @@ jobs:
 
 
       # --------------------------------------------------------
-      # Python
+      # Setup Python
       # --------------------------------------------------------
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
-
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
 
       # --------------------------------------------------------
@@ -55,10 +62,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-
           python -m pip install --upgrade pip
-
           pip install -r requirements.txt
+          pip install pytest
 
 
       # --------------------------------------------------------
@@ -67,31 +73,35 @@ jobs:
 
       - name: Run pytest
         env:
-
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_PROJECT: "enterprise-agentic-rag-ci"
 
         run: |
+          pytest -v
 
-          pytest -vv
 
+# ============================================================
+# JOB 2 — DOCKER BUILD
+# ============================================================
 
-  # ==========================================================
-  # JOB 2 — DOCKER BUILD + PUSH
-  # ==========================================================
+  docker-build:
 
-  docker:
+    name: Docker Build
 
-    name: Docker Build and Push
+    runs-on: ubuntu-latest
 
     needs:
       - test
 
-    runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
 
       # --------------------------------------------------------
-      # Checkout
+      # Checkout repository
       # --------------------------------------------------------
 
       - name: Checkout repository
@@ -99,55 +109,148 @@ jobs:
 
 
       # --------------------------------------------------------
-      # Login to GHCR
+      # Setup Docker Buildx
       # --------------------------------------------------------
 
-      - name: Log in to GitHub Container Registry
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+
+      # --------------------------------------------------------
+      # Build Docker image
+      # --------------------------------------------------------
+
+      - name: Build Docker image
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+        run: |
+          docker build \
+            --build-arg GROQ_API_KEY="${GROQ_API_KEY}" \
+            -t $IMAGE_NAME:${{ github.sha }} \
+            -t $IMAGE_NAME:latest \
+            .
+
+
+      # --------------------------------------------------------
+      # Verify Docker image
+      # --------------------------------------------------------
+
+      - name: Verify Docker image
+        run: |
+          docker images $IMAGE_NAME
+
+
+# ============================================================
+# JOB 3 — DOCKER IMAGE PUSH TO GHCR
+# ============================================================
+
+  docker-push:
+
+    name: Push Docker Image to GHCR
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - docker-build
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      # --------------------------------------------------------
+      # Checkout repository
+      # --------------------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # --------------------------------------------------------
+      # Login to GitHub Container Registry
+      # --------------------------------------------------------
+
+      - name: Login to GHCR
         uses: docker/login-action@v3
-
         with:
-
           registry: ghcr.io
-
           username: ${{ github.actor }}
-
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
       # --------------------------------------------------------
-      # Docker metadata
+      # Setup Docker Buildx
       # --------------------------------------------------------
 
-      - name: Extract Docker metadata
-
-        id: meta
-
-        uses: docker/metadata-action@v5
-
-        with:
-
-          images: ghcr.io/${{ github.repository }}
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
 
       # --------------------------------------------------------
-      # Build and push
+      # Build and push image
       # --------------------------------------------------------
 
       - name: Build and push Docker image
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
-        uses: docker/build-push-action@v6
+        run: |
 
-        with:
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}
 
-          context: .
+          IMAGE_ID=$(echo "$IMAGE_ID" | tr '[:upper:]' '[:lower:]')
 
-          push: true
+          echo "Building image:"
+          echo "$IMAGE_ID"
 
-          tags: |
+          docker build \
+            --build-arg GROQ_API_KEY="${GROQ_API_KEY}" \
+            -t "$IMAGE_ID:${{ github.sha }}" \
+            -t "$IMAGE_ID:latest" \
+            .
 
-            ghcr.io/${{ github.repository }}:latest
+          docker push "$IMAGE_ID:${{ github.sha }}"
 
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker push "$IMAGE_ID:latest"
 
-          labels: ${{ steps.meta.outputs.labels }}
+
+# ============================================================
+# JOB 4 — CI SUMMARY
+# ============================================================
+
+  ci-summary:
+
+    name: CI Summary
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - test
+      - docker-build
+      - docker-push
+
+    steps:
+
+      - name: CI completed successfully
+        run: |
+
+          echo "=============================================="
+          echo "ENTERPRISE AGENTIC RAG CI/CD"
+          echo "=============================================="
+
+          echo ""
+          echo "Python tests: PASSED"
+          echo "Docker build: PASSED"
+          echo "Docker image: PUSHED"
+          echo ""
+
+          echo "Image:"
+          echo "ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}"
+
+          echo ""
+          echo "Commit:"
+          echo "${{ github.sha }}"
+
+          echo "=============================================="
