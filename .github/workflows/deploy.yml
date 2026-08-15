@@ -1,0 +1,108 @@
+name: Deploy Enterprise Agentic RAG
+
+on:
+
+  workflow_dispatch:
+
+    inputs:
+
+      image_tag:
+        description: "Docker image tag to deploy"
+        required: true
+        default: "latest"
+
+
+jobs:
+
+  deploy:
+
+    name: Deploy Docker Image
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+
+      # ======================================================
+      # Checkout
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ======================================================
+      # Login to GHCR
+      # ======================================================
+
+      - name: Login to GitHub Container Registry
+
+        uses: docker/login-action@v3
+
+        with:
+
+          registry: ghcr.io
+
+          username: ${{ github.actor }}
+
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      # ======================================================
+      # Pull Docker image
+      # ======================================================
+
+      - name: Pull Docker image
+
+        run: |
+
+          docker pull \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
+
+      # ======================================================
+      # Verify image
+      # ======================================================
+
+      - name: Verify Docker image
+
+        run: |
+
+          docker images
+
+          docker image inspect \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
+
+      # ======================================================
+      # Deployment simulation
+      # ======================================================
+
+      - name: Deploy application
+
+        run: |
+
+          echo "=============================================="
+          echo "DEPLOYMENT"
+          echo "=============================================="
+
+          echo "Application:"
+          echo "Enterprise Agentic RAG"
+
+          echo "Image:"
+          echo "ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}"
+
+          echo "Environment:"
+          echo "production"
+
+          echo ""
+          echo "Docker image successfully pulled."
+          echo "Application is ready for deployment."
+
+          echo "=============================================="
