@@ -1,0 +1,21 @@
+services:
+
+  enterprise-rag:
+
+    image: ghcr.io/almovidhussaini/enterprise-agentic-rag-llmops:latest
+
+    container_name: enterprise-agentic-rag-prod
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./data:/app/data
+
+    command:
+      python -m app.main

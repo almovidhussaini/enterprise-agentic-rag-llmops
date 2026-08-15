@@ -1,0 +1,93 @@
+name: Rollback Enterprise Agentic RAG
+
+on:
+
+  workflow_dispatch:
+
+    inputs:
+
+      image_tag:
+
+        description: "Known-good Docker image tag"
+
+        required: true
+
+        default: "1.0.0"
+
+
+jobs:
+
+  rollback:
+
+    name: Rollback Production
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+
+    permissions:
+
+      contents: read
+
+      packages: read
+
+    steps:
+
+      - name: Login to GHCR
+
+        uses: docker/login-action@v3
+
+        with:
+
+          registry: ghcr.io
+
+          username: ${{ github.actor }}
+
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Pull known-good image
+
+        run: |
+
+          docker pull \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
+
+      - name: Verify image
+
+        run: |
+
+          docker image inspect \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+
+
+      - name: Rollback
+
+        run: |
+
+          echo "======================================"
+
+          echo "PRODUCTION ROLLBACK"
+
+          echo "======================================"
+
+          echo ""
+
+          echo "Application:"
+          echo "Enterprise Agentic RAG"
+
+          echo ""
+
+          echo "Restoring image:"
+
+          echo "ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}"
+
+          echo ""
+
+          echo "Rollback image verified."
+
+          echo "Production deployment can use this image."
+
+          echo "======================================"
