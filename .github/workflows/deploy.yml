@@ -1,22 +1,18 @@
 name: Deploy Enterprise Agentic RAG
 
 on:
-
   workflow_dispatch:
-
     inputs:
-
       image_tag:
         description: "Docker image tag to deploy"
         required: true
         default: "latest"
 
-
 jobs:
 
   deploy:
 
-    name: Deploy Docker Image
+    name: Deploy and Test Docker Image
 
     runs-on: ubuntu-latest
 
@@ -42,15 +38,10 @@ jobs:
       # ======================================================
 
       - name: Login to GitHub Container Registry
-
         uses: docker/login-action@v3
-
         with:
-
           registry: ghcr.io
-
           username: ${{ github.actor }}
-
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
@@ -59,9 +50,7 @@ jobs:
       # ======================================================
 
       - name: Pull Docker image
-
         run: |
-
           docker pull \
             ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 
@@ -71,9 +60,7 @@ jobs:
       # ======================================================
 
       - name: Verify Docker image
-
         run: |
-
           docker images
 
           docker image inspect \
@@ -81,28 +68,127 @@ jobs:
 
 
       # ======================================================
-      # Deployment simulation
+      # Run container
       # ======================================================
 
-      - name: Deploy application
-
+      - name: Start application container
         run: |
+          docker run -d \
+            --name enterprise-agentic-rag \
+            -p 8000:8000 \
+            -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 
-          echo "=============================================="
-          echo "DEPLOYMENT"
-          echo "=============================================="
 
-          echo "Application:"
-          echo "Enterprise Agentic RAG"
+      # ======================================================
+      # Show container status
+      # ======================================================
 
-          echo "Image:"
-          echo "ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}"
+      - name: Check container
+        run: |
+          docker ps -a
 
-          echo "Environment:"
-          echo "production"
+          echo "Waiting for application to start..."
+
+
+      # ======================================================
+      # Wait for FastAPI
+      # ======================================================
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+
+            echo "Attempt $i/30"
+
+            if curl --fail --silent http://localhost:8000/health; then
+              echo ""
+              echo "API is healthy!"
+              exit 0
+            fi
+
+            sleep 5
+
+          done
+
+          echo "API failed to start."
+
+          echo "========== CONTAINER LOGS =========="
+          docker logs enterprise-agentic-rag
+
+          exit 1
+
+
+      # ======================================================
+      # Test root endpoint
+      # ======================================================
+
+      - name: Test root endpoint
+        run: |
+          echo "Testing /"
+
+          curl --fail \
+            http://localhost:8000/
 
           echo ""
-          echo "Docker image successfully pulled."
-          echo "Application is ready for deployment."
 
-          echo "=============================================="
+
+      # ======================================================
+      # Test health endpoint
+      # ======================================================
+
+      - name: Test health endpoint
+        run: |
+          echo "Testing /health"
+
+          curl --fail \
+            http://localhost:8000/health
+
+          echo ""
+
+
+      # ======================================================
+      # Test Agentic RAG endpoint
+      # ======================================================
+
+      - name: Test Agentic RAG /ask endpoint
+        run: |
+
+          echo "Testing /ask endpoint..."
+
+          RESPONSE=$(curl --fail \
+            -X POST \
+            http://localhost:8000/ask \
+            -H "Content-Type: application/json" \
+            -d '{"question":"What is the main contribution of the Transformer paper?"}')
+
+          echo "API RESPONSE:"
+          echo "$RESPONSE"
+
+
+      # ======================================================
+      # Show final container logs
+      # ======================================================
+
+      - name: Container logs
+        if: always()
+        run: |
+          echo "========== CONTAINER STATUS =========="
+
+          docker ps -a
+
+          echo ""
+          echo "========== CONTAINER LOGS =========="
+
+          docker logs enterprise-agentic-rag
+
+
+      # ======================================================
+      # Stop container
+      # ======================================================
+
+      - name: Stop container
+        if: always()
+        run: |
+          docker stop enterprise-agentic-rag || true
+          docker rm enterprise-agentic-rag || true
