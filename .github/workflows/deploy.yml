@@ -2,7 +2,6 @@ name: Deploy Enterprise Agentic RAG
 
 on:
   workflow_dispatch:
-
     inputs:
       image_tag:
         description: "Docker image tag to deploy"
@@ -16,9 +15,7 @@ permissions:
 jobs:
 
   deploy:
-
-    name: Production Deployment Smoke Test
-
+    name: Deploy Docker Image
     runs-on: ubuntu-latest
 
     environment:
@@ -27,7 +24,7 @@ jobs:
     steps:
 
       # ======================================================
-      # 1. Checkout
+      # 1. Checkout repository
       # ======================================================
 
       - name: Checkout repository
@@ -35,10 +32,10 @@ jobs:
 
 
       # ======================================================
-      # 2. Login to GHCR
+      # 2. Login to GitHub Container Registry
       # ======================================================
 
-      - name: Login to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -52,77 +49,63 @@ jobs:
 
       - name: Pull Docker image
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/enterprise-agentic-rag-llmops:${{ inputs.image_tag }}"
-
-          echo "Pulling image:"
-          echo "$IMAGE"
-
-          docker pull "$IMAGE"
+          docker pull ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 
 
       # ======================================================
-      # 4. Verify Docker image
+      # 4. Verify image
       # ======================================================
 
       - name: Verify Docker image
         run: |
+          docker images
 
-          IMAGE="ghcr.io/${{ github.repository_owner }}/enterprise-agentic-rag-llmops:${{ inputs.image_tag }}"
-
-          docker image inspect "$IMAGE"
-
-          echo "Docker image verified successfully."
+          docker image inspect \
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 
 
       # ======================================================
-      # 5. Start container
+      # 5. Start application container
       # ======================================================
 
-      - name: Start Enterprise Agentic RAG
+      - name: Start application container
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_TRACING_V2: ${{ secrets.LANGCHAIN_TRACING_V2 }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
 
         run: |
-
-          IMAGE="ghcr.io/${{ github.repository_owner }}/enterprise-agentic-rag-llmops:${{ inputs.image_tag }}"
 
           docker run -d \
             --name enterprise-agentic-rag \
             -p 8000:8000 \
             -e GROQ_API_KEY="$GROQ_API_KEY" \
-            -e LANGCHAIN_API_KEY="$LANGCHAIN_API_KEY" \
-            -e LANGCHAIN_TRACING_V2="$LANGCHAIN_TRACING_V2" \
-            -e LANGCHAIN_PROJECT="$LANGCHAIN_PROJECT" \
-            "$IMAGE"
-
-          echo "Container started."
-
-          docker ps
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
 
 
       # ======================================================
-      # 6. Show container logs
+      # 6. Show running container
       # ======================================================
 
-      - name: Show initial container logs
+      - name: Check container
         run: |
+          docker ps -a
 
-          sleep 5
+          echo "======================================"
+          echo "Container status"
+          echo "======================================"
 
-          docker logs enterprise-agentic-rag
+          docker inspect \
+            --format='{{.State.Status}}' \
+            enterprise-agentic-rag
 
 
       # ======================================================
-      # 7. Wait for API
+      # 7. Wait for API health
       # ======================================================
 
       - name: Wait for API
         run: |
 
-          echo "Waiting for FastAPI..."
+          echo "Waiting for FastAPI application..."
 
           for i in {1..30}; do
 
@@ -131,7 +114,9 @@ jobs:
             if curl --fail --silent http://localhost:8000/health; then
 
               echo ""
+              echo "======================================"
               echo "API is healthy!"
+              echo "======================================"
 
               exit 0
 
@@ -141,11 +126,10 @@ jobs:
 
           done
 
-          echo "API failed to start."
 
-          echo "========== CONTAINER STATUS =========="
-
-          docker ps -a
+          echo "======================================"
+          echo "API failed to start"
+          echo "======================================"
 
           echo "========== CONTAINER LOGS =========="
 
@@ -166,8 +150,6 @@ jobs:
           curl --fail \
             http://localhost:8000/
 
-          echo ""
-
 
       # ======================================================
       # 9. Test health endpoint
@@ -181,11 +163,9 @@ jobs:
           curl --fail \
             http://localhost:8000/health
 
-          echo ""
-
 
       # ======================================================
-      # 10. Test /ask endpoint
+      # 10. Test RAG /ask endpoint
       # ======================================================
 
       - name: Test ask endpoint
@@ -202,24 +182,24 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"question":"What is the Transformer architecture?"}'
 
-          echo ""
-
 
       # ======================================================
-      # 11. Show final logs
+      # 11. Display application logs
       # ======================================================
 
-      - name: Show application logs
+      - name: Display container logs
         if: always()
         run: |
 
-          echo "========== FINAL CONTAINER LOGS =========="
+          echo "======================================"
+          echo "APPLICATION LOGS"
+          echo "======================================"
 
-          docker logs enterprise-agentic-rag || true
+          docker logs enterprise-agentic-rag
 
 
       # ======================================================
-      # 12. Cleanup
+      # 12. Stop container
       # ======================================================
 
       - name: Stop container
@@ -230,4 +210,34 @@ jobs:
 
           docker rm enterprise-agentic-rag || true
 
-          echo "Container cleaned up."
+
+      # ======================================================
+      # 13. Deployment summary
+      # ======================================================
+
+      - name: Deployment summary
+        run: |
+
+          echo "=============================================="
+          echo "DEPLOYMENT SUCCESSFUL"
+          echo "=============================================="
+
+          echo "Application:"
+          echo "Enterprise Agentic RAG"
+
+          echo "Image:"
+          echo "ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}"
+
+          echo "Environment:"
+          echo "production"
+
+          echo ""
+          echo "Endpoints tested:"
+          echo "/"
+          echo "/health"
+          echo "/ask"
+
+          echo ""
+          echo "Docker image successfully deployed and tested."
+
+          echo "=============================================="

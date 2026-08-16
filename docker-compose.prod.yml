@@ -1,4 +1,5 @@
 services:
+
   enterprise-rag:
 
     image: ghcr.io/almovidhussaini/enterprise-agentic-rag-llmops:latest
