@@ -1,5 +1,4 @@
 services:
-
   enterprise-rag:
 
     image: ghcr.io/almovidhussaini/enterprise-agentic-rag-llmops:latest
@@ -16,6 +15,3 @@ services:
 
     volumes:
       - ./data:/app/data
-
-    command:
-      python -m app.main
