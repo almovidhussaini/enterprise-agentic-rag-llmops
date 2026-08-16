@@ -162,10 +162,34 @@ jobs:
 
           curl --fail \
             http://localhost:8000/health
+      
 
+            # ======================================================
+      # 10. Test readiness endpoint
+      # ======================================================
+
+      - name: Test readiness endpoint
+        run: |
+
+          echo "Testing /ready endpoint..."
+
+          curl --fail \
+            http://localhost:8000/ready
+
+            # ======================================================
+      # Test metrics endpoint
+      # ======================================================
+
+      - name: Test metrics endpoint
+        run: |
+
+          echo "Testing /metrics endpoint..."
+
+          curl --fail \
+            http://localhost:8000/metrics
 
       # ======================================================
-      # 10. Test RAG /ask endpoint
+      # 11. Test RAG /ask endpoint
       # ======================================================
 
       - name: Test ask endpoint
@@ -184,7 +208,7 @@ jobs:
 
 
       # ======================================================
-      # 11. Display application logs
+      # 12. Display application logs
       # ======================================================
 
       - name: Display container logs
@@ -199,7 +223,7 @@ jobs:
 
 
       # ======================================================
-      # 12. Stop container
+      # 13. Stop container
       # ======================================================
 
       - name: Stop container
@@ -212,7 +236,7 @@ jobs:
 
 
       # ======================================================
-      # 13. Deployment summary
+      # 14. Deployment summary
       # ======================================================
 
       - name: Deployment summary

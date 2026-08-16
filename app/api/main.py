@@ -3,7 +3,7 @@ import time
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.agents.graph import graph
 
 
@@ -41,6 +41,8 @@ app = FastAPI(
     description="Enterprise Agentic RAG + LLMOps API",
     version="1.0",
 )
+
+Instrumentator().instrument(app).expose(app)
 
 
 # ============================================================
@@ -202,3 +204,16 @@ def ask_question(request: QuestionRequest):
             status_code=500,
             detail=str(exc),
         )
+@app.get("/ready")
+def readiness():
+    """
+    Readiness check.
+
+    Indicates whether the application is ready
+    to receive requests.
+    """
+
+    return {
+        "status": "ready",
+        "service": "enterprise-agentic-rag",
+    }
