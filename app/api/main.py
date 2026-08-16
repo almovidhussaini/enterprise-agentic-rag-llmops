@@ -170,7 +170,7 @@ def ask_question(request: QuestionRequest):
     start_time = time.time()
 
     logger.info(
-        "RAG request received | question=%s",
+        "Request received | question=%s",
         request.question
     )
 
@@ -182,15 +182,22 @@ def ask_question(request: QuestionRequest):
 
         elapsed_time = time.time() - start_time
 
-        route = result.get("route")
+        route = result.get("route", "unknown")
         answer = result.get("answer", "")
 
-        retrieved_docs = result.get("retrieved_docs", [])
+        # General questions may not have retrieved documents
+        retrieved_docs = result.get("retrieved_docs") or []
+
+        retrieval_used = (
+            route in ["vector_rag", "hybrid_rag"]
+            and len(retrieved_docs) > 0
+        )
 
         logger.info(
-            "RAG request completed | route=%s | "
-            "retrieved_docs=%d | latency=%.2fs",
+            "Request completed | route=%s | "
+            "retrieval_used=%s | retrieved_docs=%d | latency=%.2fs",
             route,
+            retrieval_used,
             len(retrieved_docs),
             elapsed_time,
         )
@@ -201,6 +208,7 @@ def ask_question(request: QuestionRequest):
             "answer": answer,
             "latency_seconds": round(elapsed_time, 3),
             "retrieved_documents": len(retrieved_docs),
+            "retrieval_used": retrieval_used,
         }
 
     except Exception as exc:
@@ -208,7 +216,7 @@ def ask_question(request: QuestionRequest):
         elapsed_time = time.time() - start_time
 
         logger.exception(
-            "RAG request failed | latency=%.2fs",
+            "Request failed | latency=%.2fs",
             elapsed_time,
         )
 
