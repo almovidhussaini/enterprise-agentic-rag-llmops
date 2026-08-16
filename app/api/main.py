@@ -16,7 +16,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
 
-logger = logging.getLogger("enterprise-rag")
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -164,46 +164,59 @@ def get_metrics():
 # ============================================================
 # Ask Endpoint
 # ============================================================
-
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
 
+    start_time = time.time()
+
     logger.info(
         "RAG request received | question=%s",
-        request.question,
+        request.question
     )
 
     try:
 
-        result = graph.invoke(
-            {
-                "question": request.question
-            }
-        )
+        result = graph.invoke({
+            "question": request.question
+        })
 
+        elapsed_time = time.time() - start_time
+
+        route = result.get("route")
         answer = result.get("answer", "")
 
+        retrieved_docs = result.get("retrieved_docs", [])
+
         logger.info(
-            "RAG request completed | route=%s",
-            result.get("route"),
+            "RAG request completed | route=%s | "
+            "retrieved_docs=%d | latency=%.2fs",
+            route,
+            len(retrieved_docs),
+            elapsed_time,
         )
 
         return {
             "question": request.question,
-            "route": result.get("route"),
+            "route": route,
             "answer": answer,
+            "latency_seconds": round(elapsed_time, 3),
+            "retrieved_documents": len(retrieved_docs),
         }
 
     except Exception as exc:
 
+        elapsed_time = time.time() - start_time
+
         logger.exception(
-            "RAG request failed"
+            "RAG request failed | latency=%.2fs",
+            elapsed_time,
         )
 
         raise HTTPException(
             status_code=500,
             detail=str(exc),
         )
+
 @app.get("/ready")
 def readiness():
     """
